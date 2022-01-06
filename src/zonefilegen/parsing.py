@@ -60,25 +60,28 @@ def parse_toml_file(input_file_path: pathlib.Path) -> Tuple[zonefilegen.core.Zon
     ipv4_ptr_candidates = []
     ipv6_ptr_candidates = []
 
+    rev_ns_records = []
     for rec in fwd_zone.records:
         if rec.record_type == 'A':
             ipv4_ptr_candidates.append((rec.name, rec.ttl, ipaddress.IPv4Address(rec.data)))
         elif rec.record_type == 'AAAA':
             ipv6_ptr_candidates.append((rec.name, rec.ttl, ipaddress.IPv6Address(rec.data)))
+        elif rec.record_type == 'NS' and rec.name == fwd_zone.name:
+            rev_ns_records.append((rec.name, rec.ttl, rec.data))
 
     reverse_zones = []
     for network_str in data['networks']:
         network = ipaddress.ip_network(network_str, strict=True)
         if type(network) is ipaddress.IPv4Network:
-            reverse_zones.append(zonefilegen.generation.build_reverse_zone(network, ipv4_ptr_candidates, data['default_ttl']))
             if network.prefixlen % 8 != 0:
                 logging.fatal("IPv4 network prefix must be divisible by 8")
                 exit(1)
+            reverse_zones.append(zonefilegen.generation.build_reverse_zone(network, ipv4_ptr_candidates, data['default_ttl'], rev_ns_records))
 
         elif type(network) is ipaddress.IPv6Network:
-            reverse_zones.append(zonefilegen.generation.build_reverse_zone(network, ipv6_ptr_candidates, data['default_ttl']))
             if network.prefixlen % 4 != 0:
                 logging.fatal("IPv6 network prefix must be divisible by 4")
                 exit(1)
+            reverse_zones.append(zonefilegen.generation.build_reverse_zone(network, ipv6_ptr_candidates, data['default_ttl'], rev_ns_records))
 
     return (fwd_zone, reverse_zones, data['soa'], file_digest)

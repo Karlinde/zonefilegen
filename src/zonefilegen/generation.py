@@ -1,5 +1,5 @@
 import logging
-from typing import Tuple
+from typing import List, Tuple
 
 import zonefilegen.core
 import zonefilegen.parsing
@@ -21,13 +21,23 @@ def build_soa_record(soa_dict: dict, serial_number: int) -> zonefilegen.core.Res
         f"{soa_dict['negative_caching_ttl']})"
     return soa_rec
 
-def build_reverse_zone(network, ptr_candidates: Tuple, default_ttl: int) -> zonefilegen.core.Zone:
+def build_reverse_zone(network, ptr_candidates: Tuple, default_ttl: int, ns_records: List[Tuple[str, int, str]]) -> zonefilegen.core.Zone:
     """
     Checks a set of addresses if they are part of a network and
     include them as PTR records in a reverse zone for that network in such case.
     """
     rev_zone = zonefilegen.core.Zone(zonefilegen.parsing.get_rev_zone_name(network), default_ttl)
     included_ptr_names = set()
+
+    # Use the same NS records for reverse zones as for the forward zones
+    for (name, ttl, data) in ns_records:
+        rec = zonefilegen.core.ResourceRecord()
+        rec.name = '@'
+        rec.record_type = 'NS'
+        rec.record_class = 'IN'
+        rec.ttl = ttl
+        rec.data = data
+        rev_zone.records.append(rec)
 
     for (name, ttl, addr) in ptr_candidates:
         if addr in network:
